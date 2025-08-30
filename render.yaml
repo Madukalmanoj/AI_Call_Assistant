@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: multivoicecallassistant
+    env: python
+    buildCommand: pip install -r requirements.txt && pip install TTS==0.21.2 transformers accelerate && pip install --index-url https://download.pytorch.org/whl/cpu torch
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_NAME
+        value: MultiVoiceCallAssistant
+      - key: DATA_DIR
+        value: ./data
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: BASE_URL
+        sync: false
