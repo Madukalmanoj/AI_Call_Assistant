@@ -11,7 +11,7 @@ from twilio.rest import Client
 
 
 def build_ui():
-    with gr.Blocks(title=settings.app_name) as demo:
+    with gr.Blocks(title=settings.app_name, analytics_enabled=False) as demo:
         gr.Markdown(f"# {settings.app_name}")
 
         with gr.Tab("Manage Voices"):
@@ -31,14 +31,14 @@ def build_ui():
 
             def do_train(name, sample_path):
                 if not name or not sample_path:
-                    return gr.update(visible=True, value="Please provide name and sample."), None
+                    return gr.update(visible=True, value="Please provide name and sample.")
                 clean = sanitize_name(name)
                 vdir = os.path.join(VOICES_DIR, clean)
                 os.makedirs(vdir, exist_ok=True)
                 ref_path = os.path.join(vdir, "reference.wav")
                 shutil.copy(sample_path, ref_path)
                 upsert_voice(clean, ref_path)
-                return gr.update(visible=True, value="Voice saved."), True
+                return gr.update(visible=True, value="Voice saved.")
 
             def do_refresh():
                 items = db_list_voices()
@@ -64,7 +64,8 @@ def build_ui():
                 items, names_update = do_refresh()
                 return names_update, items
 
-            train_btn.click(do_train, inputs=[name_in, sample_in], outputs=[train_status, refresh_btn])
+            train_click = train_btn.click(do_train, inputs=[name_in, sample_in], outputs=[train_status])
+            train_click.then(do_refresh, None, [voices_df, sel_voice])
             refresh_btn.click(do_refresh, None, [voices_df, sel_voice])
             prev_btn.click(do_preview, inputs=[sel_voice], outputs=[prev_audio])
             del_btn.click(do_delete, inputs=[sel_voice], outputs=[sel_voice, voices_df])
@@ -106,12 +107,11 @@ def build_ui():
             def do_call(voice_name, to_number, initial_message):
                 client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
                 call_id = __import__("uuid").uuid4().hex
-                # Insert call row
                 from app.db import create_call
                 create_call(call_id, to_number, voice_name, initial_message)
                 answer_url = f"{settings.base_url}/twilio/answer?call_id={call_id}"
                 status_url = f"{settings.base_url}/twilio/status?call_id={call_id}"
-                call = client.calls.create(
+                client.calls.create(
                     to=to_number,
                     from_=settings.twilio_phone_number,
                     url=answer_url,
