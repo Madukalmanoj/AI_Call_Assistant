@@ -4,14 +4,13 @@ from fastapi.staticfiles import StaticFiles
 import gradio as gr
 
 from app.settings import settings, STATIC_DIR
-from app.ui import build_ui
 from app.twilio_routes import router as twilio_router
 from app.voice_routes import router as voice_router
 from app.tts_routes import router as tts_router
 from app.calls_routes import router as calls_router
 from app.db import init_db
 
-
+# Initialize FastAPI
 app = FastAPI(title=settings.app_name)
 
 # CORS
@@ -35,6 +34,17 @@ app.include_router(calls_router, prefix="/api/calls", tags=["calls"])
 # Initialize DB
 init_db()
 
-# Gradio UI
-blocks = build_ui()
-app = gr.mount_gradio_app(app, blocks, path="/")
+# Lazy Gradio UI
+blocks = None  # Do not build UI yet
+
+def get_gradio_blocks():
+    global blocks
+    if blocks is None:
+        from app.ui import build_ui
+        blocks = build_ui()  # load UI + models only when first request
+    return blocks
+
+# Mount Gradio lazily
+@app.on_event("startup")
+def mount_gradio():
+    app_gr = gr.mount_gradio_app(app, get_gradio_blocks(), path="/")
