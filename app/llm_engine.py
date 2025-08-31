@@ -5,31 +5,44 @@ from typing import List, Dict
 class LLMEngine:
     def __init__(self, model_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.model_name = model_name
+        self._ok = False
+        self._loaded = False
+        self._err: Exception | None = None
+        self.pipe = None
+
+    def _ensure_loaded(self) -> None:
+        if self._loaded or self._err is not None:
+            return
         try:
             transformers = importlib.import_module("transformers")
             AutoModelForCausalLM = transformers.AutoModelForCausalLM
             AutoTokenizer = transformers.AutoTokenizer
             pipeline = transformers.pipeline
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(model_name)
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            model = AutoModelForCausalLM.from_pretrained(self.model_name)
             self.pipe = pipeline(
                 "text-generation",
-                model=self.model,
-                tokenizer=self.tokenizer,
+                model=model,
+                tokenizer=tokenizer,
                 max_new_tokens=180,
                 do_sample=True,
                 top_p=0.9,
                 temperature=0.6,
             )
             self._ok = True
-        except Exception:
+            self._loaded = True
+        except Exception as e:
+            # Do not block startup; keep fallback behavior
+            self._err = e
             self._ok = False
+            self._loaded = False
 
     def chat(self, messages: List[Dict[str, str]]) -> str:
-        if not getattr(self, "_ok", False):
-            # Minimal fallback if transformers isn't available
-            last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
-            return ("Noted: " + last_user)[:100]
+        # Lazy load on first use
+        self._ensure_loaded()
+        if not (self._ok and self.pipe is not None):
+            last_user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+            return ("Noted: " + last_user)[:120]
         prompt = ""
         for m in messages:
             role = m.get("role", "user")
