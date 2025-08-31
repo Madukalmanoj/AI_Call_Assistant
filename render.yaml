@@ -2,9 +2,16 @@ services:
   - type: web
     name: multivoicecallassistant
     env: python
-    buildCommand: pip install -r requirements.txt && pip install TTS==0.21.2 transformers accelerate && pip install --index-url https://download.pytorch.org/whl/cpu torch
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: >
+      python -m pip install -U pip setuptools wheel &&
+      python -m pip install -r requirements.txt &&
+      python -m pip install "TTS==0.21.2" transformers accelerate &&
+      python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level debug
+    healthCheckPath: /healthz
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: APP_NAME
         value: MultiVoiceCallAssistant
       - key: DATA_DIR
